@@ -3,10 +3,33 @@
 # This will return 0 when it successfully talks to the ProxySQL daemon via localhost
 # Failures return 1
 
-mariadb --no-defaults \
-  --protocol socket \
-  --socket=/var/lib/kolla/proxysql/admin.sock \
-  --user={{ proxysql_admin_user }} \
-  --password={{ proxysql_admin_password }} \
-  --skip-ssl \
-  -e "SELECT 1" 2>/dev/null
+if command -v mariadb >/dev/null 2>&1; then
+  mariadb --no-defaults \
+    --protocol socket \
+    --socket=/var/lib/kolla/proxysql/admin.sock \
+    --user={{ proxysql_admin_user }} \
+    --password={{ proxysql_admin_password }} \
+    --skip-ssl \
+    -e "SELECT 1" 2>/dev/null
+elif command -v mysql >/dev/null 2>&1; then
+  mysql --no-defaults \
+    --protocol socket \
+    --socket=/var/lib/kolla/proxysql/admin.sock \
+    --user={{ proxysql_admin_user }} \
+    --password={{ proxysql_admin_password }} \
+    --skip-ssl \
+    -e "SELECT 1" 2>/dev/null
+else
+  python3 -c '
+import socket, sys
+try:
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.settimeout(2)
+    s.connect("/var/lib/kolla/proxysql/admin.sock")
+    data = s.recv(1024)
+    s.close()
+    sys.exit(0 if data else 1)
+except Exception:
+    sys.exit(1)
+'
+fi
